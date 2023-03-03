@@ -16,13 +16,27 @@ from scipy.optimize import least_squares
 from scipy.stats import rv_histogram
 
 
-def select_electrode():
+def select_electrode(electrode):
+    """
+    User selects an electrode from a list,
+    Function obtains the corresponding Uj0, Xj, wj parameters
+    
+    Inputs:
+    electrode - (str) Name of the electrode to be modelled
+    
+    Returns:
+    electrode_params - DataFrame containing the corresponding parameters
+    
+    """
     # user selects electrode from list
     # function pulls the parameters from a library and assigns the values automatically
     # if the electrode is not on the list
     # user will be prompted to add their own 
-    # 
-    return
+    
+    path = 'data/electrode_parameters/' + electrode
+    electrode_params = pd.read_csv(path, index_col = 0)
+    
+    return electrode_params
 
 def individual_reactions(U, U0, Xj, w, T):
     """
@@ -38,6 +52,7 @@ def individual_reactions(U, U0, Xj, w, T):
         Note: Xj * Q (electrode capacity) = Qj (maximum capacity of reaction j; extensive)
     w: (float) Thermodynamic ideality factor for reaction j
     T: (float) Temperature (K)
+    Q_unit: (str) Unit of capacity (uA, mA, or A)
 
     Returns:
     xj: (1-D array) Fraction of filled intercalation sites (or capacity if extensive)
@@ -45,6 +60,13 @@ def individual_reactions(U, U0, Xj, w, T):
 
 
     """
+#     scale = 1
+#     if Q_unit == 'mA':
+#         scale = scale*1E3
+#     elif Q_unit == 'uA':
+#         scale = scale*1E6
+        
+    
     R, F = 8.314, 96485 # Gas constant, Faraday's constant
     f = F/(R*T)
     xj = Xj/(1 + np.exp(f*(U-U0)/w))
