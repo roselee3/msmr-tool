@@ -28,7 +28,10 @@ def load_experiment_data(filepath, cycler, cycle_num, charge=True):
     exp_capacity (data type): Cell capacity from experimental data. Units of mAh
 
     """
-    data = pd.read_csv(filepath)
+    if type(filepath) == type(pd.DataFrame()):
+        data = filepath
+    elif type(filepath) == str: 
+        data = pd.read_csv(filepath)
     
     exp_capacity = np.array([])
     exp_voltage = np.array([])

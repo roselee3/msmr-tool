@@ -16,99 +16,131 @@ from utilities import msmr_model
 
 sns.set_context('poster')
 
+st.set_page_config(layout="wide")
 
+# Sidebar with information (maybe) -------------------------------
+with st.sidebar:
+    st.title('MSMR Tool')
+    st.text('This is totally just a placeholder!!')
+    
+    
 # 1. Upload experimental data -------------------------------------
 cycler_options = ['Victor', 'Arbin', 'BioLogic', 'Other']
 cycle_direction = ['Charge', 'Discharge']
 
-exp_data = st.file_uploader(label = 'Upload experimental galvanostatic cycling data')
 
 with st.form(key = 'exp information'):
-    # User specifies the cycler
-    user_cycler = st.selectbox('Select battery cycler: ', 
-                               options = cycler_options)
+    data_in, data_out = st.columns(2)
     
-    # User inputs constant-current value
-    # Will eventually have a unit converter lol
-    current = st.number_input(label = 'Constant-current value: ', 
-                              min_value = 0.0,
-                              step = 0.00001,
-                              format = '%.5f')
-    
-    # User inputs time between data point collection (s)
-    timestep = st.number_input(label = 'Time between data points (s): ', 
-                                min_value = 0.0)
-    
-    # User inputs LCV and UCV
-    LCV = st.number_input(label = 'Lower cutoff voltage: ',
-                          format = '%.3f')
-    
-    UCV = st.number_input(label = 'Upper cutoff voltage: ',
-                          format = '%.3f')
-    
-    v_range = np.linspace(LCV, UCV, 1000)
-    
-    # User specifies cycle number of interest
-    cycle_num = st.number_input(label = 'Cycle number to analyze: ', 
-                                min_value = 1, 
-                                step = 1)
-    
-    # User specifies if this is a charge or discharge curve
-    charge_or_discharge = st.selectbox(label = 'Charge or Discharge? ',
-                                      options = cycle_direction)
-    
-    if charge_or_discharge == 'Discharge':
-        charge_check = False
-    else:
-        charge_check = True
+    with data_in:
+        st.header('1. Load experimental data')
+        exp_data = st.file_uploader(label = 'Upload experimental galvanostatic cycling data')
+        col1, col2 = st.columns(2)
+        
+        with col1:
+           
+            # User specifies the cycler
+            user_cycler = st.selectbox('Select battery cycler: ', 
+                                       options = cycler_options)
+
+            # User specifies cycle number of interest
+            cycle_num = st.number_input(label = 'Cycle number to analyze: ', 
+                                        min_value = 1, 
+                                        step = 1)
+
+            # User specifies if this is a charge or discharge curve
+            charge_or_discharge = st.selectbox(label = 'Charge or Discharge? ',
+                                              options = cycle_direction)
+        
+        with col2:
+            # User inputs constant-current value
+            # Will eventually have a unit converter lol
+            current = st.number_input(label = 'Constant-current value (mA): ', 
+                                      min_value = 0.0,
+                                      step = 0.00001,
+                                      format = '%.5f')
+
+            # User inputs time between data point collection (s)
+            timestep = st.number_input(label = 'Time between data points (s): ', 
+                                        min_value = 0.0)
+
+            # User inputs LCV and UCV
+            LCV = st.number_input(label = 'Lower cutoff voltage: ',
+                                  format = '%.3f')
+
+            UCV = st.number_input(label = 'Upper cutoff voltage: ',
+                                  format = '%.3f')
+            v_range = np.linspace(LCV, UCV, 1000)
+        
+        if charge_or_discharge == 'Discharge':
+            charge_check = False
+        else:
+            charge_check = True
  
     # eventually, i'll have a slider to adjust the sf window length
+
+    with data_out:
+        if exp_data is not None:
+            #path = '../data/' + exp_data.name # change this line once we figure out file path stuff
+
+            df = pd.read_csv(exp_data)
+            exp_capacity, exp_voltage = preprocessing.load_experiment_data(filepath = df, 
+                                                                           cycler = user_cycler, 
+                                                                           cycle_num = cycle_num, 
+                                                                           charge = charge_check)
+
+
+            # Experimental data is processed
+            exp_dudq, exp_cap_interp, exp_dudq_interp = preprocessing.clean_exp_data(exp_voltage, 
+                                                                                     exp_capacity, 
+                                                                                     constant_current = current, 
+                                                                                     timestep = timestep, 
+                                                                                     interp_voltage_range = v_range, 
+                                                                                     sf_window_length = 99)
+
+            fig1, ax = plt.subplots(1,2, figsize = (12,7), tight_layout = True)
+            ax[0].set_title('Experimental')
+            ax[0].set_xlabel('Capacity (mAh)')
+            ax[0].set_ylabel('Potential vs Na/Na+ (V)')
+            ax[0].plot(exp_capacity, exp_voltage)
+            #ax[0].plot(Q_1400_interp, v_range, '--', label = 'Interpolated')
+            #ax[0].legend()
+
+            #ax[1].set_title('interpolated data')
+            ax[1].set_xlabel('dudq (V/mAh)')
+            ax[1].set_ylabel('Potential vs Na/Na+ (V)')
+            ax[1].plot(exp_dudq, exp_voltage)
+            plt.show()
+            
+            st.empty()
+            st.pyplot(fig1)
+        else: 
+            pass
     
     data_submit = st.form_submit_button(label = 'Go!')
-    
-with st.form(key = 'process exp data'): 
-    # Experimental data is loaded 
-    path = '../data/' + exp_data.name # change this line once we figure out file path stuff
-    exp_capacity, exp_voltage = preprocessing.load_experiment_data(filepath = path, 
-                                                                   cycler = user_cycler, 
-                                                                   cycle_num = cycle_num, 
-                                                                   charge = charge_check)
-    
-    
-    # Experimental data is processed
-    exp_dudq, exp_cap_interp, exp_dudq_interp = preprocessing.clean_exp_data(exp_voltage, 
-                                                                             exp_capacity, 
-                                                                             constant_current = current, 
-                                                                             timestep = timestep, 
-                                                                             interp_voltage_range = v_range, 
-                                                                             sf_window_length = 99)
-    
-    fig1, ax = plt.subplots(1,2, figsize = (12,6), tight_layout = True)
-    ax[0].set_title('Experimental')
-    ax[0].set_xlabel('Capacity (mAh)')
-    ax[0].set_ylabel('Potential vs Na/Na+ (V)')
-    ax[0].plot(exp_capacity, exp_voltage)
-    #ax[0].plot(Q_1400_interp, v_range, '--', label = 'Interpolated')
-    #ax[0].legend()
-
-    #ax[1].set_title('interpolated data')
-    ax[1].set_xlabel('dudq (V/mAh)')
-    ax[1].set_ylabel('Potential vs Na/Na+ (V)')
-    ax[1].plot(exp_dudq, exp_voltage)
-
-    plt.show()
-    st.pyplot(fig1)
-    
-    data_process = st.form_submit_button(label = 'Go!')
-
-# st.experimental_data_editor
-
-# feed path name into load exp data
-
-
 
 
 # 2. Make initial model -------------------------------------------
 
+electrode_options = ['Graphite', 'Hard Carbon (Na)', 'LFP', 'NMC 622', 'Spinel LMO', 'Li metal', 'Na metal']
 
+with st.form(key = 'make model'):
+    st.header('2. Create initial MSMR model')
+    model_in, model_out = st.columns(2)
+    
+    # we eventually have to add something to remove the electrode option from the list if it's already taken lol
+    with model_in:
+        col3, col4 = st.columns(2)
+        with col3:
+            electrode1 = st.selectbox('Electrode 1', options = electrode_options)
+        with col4:
+            electrode2 = st.selectbox('Electrode 2', options = electrode_options)
+            
+    # feed selectbox into select_electrode
+    # obtain parameters, display on screen, show initial model vs exp data 
+    # edit parameters via st.experimental_data_editor
+    # editing parameters should result in change of model
+    # store final parameters to transfer to the fitting section
+    
+    model_submit = st.form_submit_button(label = 'Go!')
 # 3. Fit model to data --------------------------------------------
