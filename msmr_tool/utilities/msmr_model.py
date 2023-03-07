@@ -11,6 +11,7 @@ import pandas as pd
 
 from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
 from scipy.optimize import fmin_slsqp
+from scipy.interpolate import interp1d
 from scipy.optimize import LinearConstraint
 from scipy.optimize import least_squares
 from scipy.stats import rv_histogram

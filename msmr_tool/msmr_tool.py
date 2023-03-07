@@ -5,23 +5,17 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 
-from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
-from scipy.optimize import fmin_slsqp
-from scipy.optimize import LinearConstraint
-from scipy.optimize import least_squares
-from scipy.stats import rv_histogram
-
 from utilities import preprocessing
 from utilities import msmr_model
 
-sns.set_context('poster')
+sns.set_context('paper')
 
 st.set_page_config(layout="wide")
 
 # Sidebar with information (maybe) -------------------------------
 with st.sidebar:
     st.title('MSMR Tool')
-    st.text('This is totally just a placeholder!!')
+    st.text('This is totally just a placeholder!! will contain instructions later')
     
     
 # 1. Upload experimental data -------------------------------------
@@ -103,7 +97,7 @@ with st.form(key = 'exp information'):
                                                                                      interp_voltage_range = v_range, 
                                                                                      sf_window_length = 99)
 
-            fig1, ax = plt.subplots(2,1, figsize = (6,12), tight_layout = True)
+            fig1, ax = plt.subplots(2,1, figsize = (3,6), tight_layout = True)
             #ax[0].set_title('Experimental')
             ax[0].set_xlabel('Capacity (mAh)')
             ax[0].set_ylabel('Potential vs Na/Na+ (V)')
@@ -129,7 +123,7 @@ with st.form(key = 'exp information'):
 
 electrode_options = ['---', 'Graphite', 'Hard Carbon (Na)', 'LFP', 'NMC 622', 'Spinel LMO', 'Li metal', 'Na metal']
 
-with st.container():
+with st.form(key = 'make model'):
     st.header('2. Create initial MSMR model')
     # check if half or full cell
     
@@ -160,6 +154,15 @@ with st.container():
                                          key = 'PE lower Li lim',
                                          format = '%.3f')
             
+            # Input PE lower cutoff potential
+            p_V_low = st.number_input(label = 'Lower cutoff potential (V): ', 
+                                         key = 'PE LCP',
+                                         format = '%.3f')
+
+            # Input PE upper cutoff potential
+            p_V_up = st.number_input(label = 'Upper cutoff potential (V): ', 
+                                         key = 'PE UCP',
+                                         format = '%.3f')            
             if p_electrode != '---':
                 p_elec_params = msmr_model.select_electrode(p_electrode)            
                 st.dataframe(p_elec_params, use_container_width = True)
@@ -178,7 +181,17 @@ with st.container():
             # Input NE lower lithiation limit
             n_Li_lim = st.number_input(label = 'Lower Li Limit (mAh): ', 
                                          key = 'NE lower Li lim',
-                                         format = '%.3f')     
+                                         format = '%.3f')
+            
+            # Input NE lower cutoff potential
+            n_V_low = st.number_input(label = 'Lower cutoff potential (V): ', 
+                                         key = 'NE LCP',
+                                         format = '%.3f')
+
+            # Input NE upper cutoff potential
+            n_V_up = st.number_input(label = 'Upper cutoff potential (V): ', 
+                                         key = 'NE UCP',
+                                         format = '%.3f')                   
             if n_electrode != '---':
                 n_elec_params = msmr_model.select_electrode(n_electrode)
                 st.dataframe(n_elec_params, use_container_width = True)
@@ -197,29 +210,45 @@ with st.container():
     
     # edit parameters via st.experimental_data_editor
     # editing parameters should result in change of model
-    
+        
     # store final parameters to transfer to the fitting section
-    with model_out:
-        with st.form(key = 'make model'):
-            elec_params = np.append(p_electrode, n_electrode)
-            
+    
+    model_submit = st.form_submit_button(label = 'Generate Model')
+
             # change usable cap to be p_cap if half-cell,
             # nominal/rated cap if full-cell
-#             Q_IM, V_IM, dqdu_IM, dudq_IM = msmr_model.whole_cell(elec_params,
-#                                                                  temp = temp, 
-#                                                                  nor_pos, nor_neg,
-#                                                                  pos_volt_range,
-#                                                                  neg_volt_range,
-#                                                                  pos_lower_li_limit = p_Li_lim,
-#                                                                  neg_lower_li_limit = n_Li_lim, 
-#                                                                  n_p = 1, 
-#                                                                  p_capacity = p_capacity,
-#                                                                  usable_cap = p_capacity, 
-#                                                                  Qj_or_Xj = 'Qj',
-#                                                                  all_output = False)
-            
-            model_submit = st.form_submit_button(label = 'Generate Model')
 
-            if model_submit: 
-                elec_params = np.append(p_electrode, n_electrode)
+    if model_submit:
+        elec_params = np.append(p_elec_params, n_elec_params)
+        Q_IM, V_IM, dqdu_IM, dudq_IM = msmr_model.whole_cell(parameter_matrix = elec_params,
+                                                                     temp = temp, 
+                                                                     nor_pos = nor_pos, 
+                                                                     nor_neg = nor_neg,
+                                                                     pos_volt_range = (p_V_low, p_V_up),
+                                                                     neg_volt_range = (n_V_low, n_V_up),
+                                                                     pos_lower_li_limit = p_Li_lim,
+                                                                     neg_lower_li_limit = n_Li_lim, 
+                                                                     n_p = 1, 
+                                                                     p_capacity = p_capacity,
+                                                                     usable_cap = p_capacity, 
+                                                                     Qj_or_Xj = 'Qj',
+                                                                     all_output = True)
+                
+        fig2, ax = plt.subplots(2,1, figsize = (3,6), tight_layout = True)
+
+        ax[0].set_xlabel('Capacity (mAh)')
+        ax[0].set_ylabel('Potential (V vs Na/Na+)')
+        ax[0].plot(np.flip(Q_IM[0]), V_IM[0], linewidth = 3)
+        ax[0].set_ylim(0, 1.25)
+
+        ax[1].set_xlabel('dudq')
+        ax[1].set_ylabel('Potential (V vs Na/Na+)')
+        ax[1].plot(dudq_IM[0], V_IM[0], linewidth = 3)
+        ax[1].set_xlim(-20, 1)
+
+        plt.show()
+            
+        with model_out:
+            st.pyplot(fig2)
+
 # 3. Fit model to data --------------------------------------------
