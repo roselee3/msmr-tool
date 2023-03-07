@@ -34,7 +34,7 @@ with st.form(key = 'exp information'):
     
     with data_in:
         st.header('1. Load experimental data')
-        exp_data = st.file_uploader(label = 'Upload experimental galvanostatic cycling data')
+        exp_data = st.file_uploader(label = 'Upload Experimental Galvanostatic Cycling Data')
         col1, col2 = st.columns(2)
         
         with col1:
@@ -51,6 +51,11 @@ with st.form(key = 'exp information'):
             # User specifies if this is a charge or discharge curve
             charge_or_discharge = st.selectbox(label = 'Charge or Discharge? ',
                                               options = cycle_direction)
+            
+            temp = st.number_input(label = 'Temperature (K): ', 
+                                      min_value = 0.0, 
+                                      value = 298.0,
+                                      format = '%.1f')
         
         with col2:
             # User inputs constant-current value
@@ -98,8 +103,8 @@ with st.form(key = 'exp information'):
                                                                                      interp_voltage_range = v_range, 
                                                                                      sf_window_length = 99)
 
-            fig1, ax = plt.subplots(1,2, figsize = (12,7), tight_layout = True)
-            ax[0].set_title('Experimental')
+            fig1, ax = plt.subplots(2,1, figsize = (6,12), tight_layout = True)
+            #ax[0].set_title('Experimental')
             ax[0].set_xlabel('Capacity (mAh)')
             ax[0].set_ylabel('Potential vs Na/Na+ (V)')
             ax[0].plot(exp_capacity, exp_voltage)
@@ -122,25 +127,99 @@ with st.form(key = 'exp information'):
 
 # 2. Make initial model -------------------------------------------
 
-electrode_options = ['Graphite', 'Hard Carbon (Na)', 'LFP', 'NMC 622', 'Spinel LMO', 'Li metal', 'Na metal']
+electrode_options = ['---', 'Graphite', 'Hard Carbon (Na)', 'LFP', 'NMC 622', 'Spinel LMO', 'Li metal', 'Na metal']
 
-with st.form(key = 'make model'):
+with st.container():
     st.header('2. Create initial MSMR model')
+    # check if half or full cell
+    
     model_in, model_out = st.columns(2)
     
+    # feed selectbox into select_electrode
     # we eventually have to add something to remove the electrode option from the list if it's already taken lol
     with model_in:
         col3, col4 = st.columns(2)
+        
         with col3:
-            electrode1 = st.selectbox('Electrode 1', options = electrode_options)
-        with col4:
-            electrode2 = st.selectbox('Electrode 2', options = electrode_options)
             
-    # feed selectbox into select_electrode
-    # obtain parameters, display on screen, show initial model vs exp data 
+#             def change_elec():
+#                 if p_electrode != '---':
+#                     p_electrode = msmr_model.select_electrode(p_electrode)
+#                     st.dataframe(p_electrode, use_container_width = True)
+                
+            p_electrode = st.selectbox('Positive Electrode: ', key = 'PE',
+                                       options = electrode_options)
+            
+            # Input PE capacity
+            p_capacity = st.number_input(label = 'Electrode Capacity (mAh): ', 
+                                         key = 'Positive electrode capacity',
+                                         format = '%.3f')
+            
+            # Input PE lower lithiation limits
+            p_Li_lim = st.number_input(label = 'Lower Li Limit (mAh): ', 
+                                         key = 'PE lower Li lim',
+                                         format = '%.3f')
+            
+            if p_electrode != '---':
+                p_elec_params = msmr_model.select_electrode(p_electrode)            
+                st.dataframe(p_elec_params, use_container_width = True)
+                p_elec_params['Xj'] = p_elec_params['Xj'] * p_capacity
+                nor_pos = p_elec_params.shape[0]
+            
+        with col4:
+            n_electrode = st.selectbox('Negative Electrode: ', key = 'NE', 
+                                       options = electrode_options)    
+            
+            # Input NE capacity
+            n_capacity = st.number_input(label = 'Electrode Capacity (mAh): ', 
+                                         key = 'Negative electrode capacity',
+                                         format = '%.3f')
+            
+            # Input NE lower lithiation limit
+            n_Li_lim = st.number_input(label = 'Lower Li Limit (mAh): ', 
+                                         key = 'NE lower Li lim',
+                                         format = '%.3f')     
+            if n_electrode != '---':
+                n_elec_params = msmr_model.select_electrode(n_electrode)
+                st.dataframe(n_elec_params, use_container_width = True)
+                n_elec_params['Xj'] = n_elec_params['Xj'] * n_capacity
+                nor_neg = n_elec_params.shape[0]
+            
+    # Capacity multiplied to Xj to convert to extensive units        
+#     p_electrode['Xj'] = p_electrode['Xj'] * p_capacity
+#     n_electrode['Xj'] = n_electrode['Xj'] * n_capacity
+    
+    
+    # obtain parameters, display on screen, 
+    # show initial model vs exp data 
+#     elec_params = np.append(p_electrode, n_electrode)
+#     st.dataframe(elec_params)
+    
     # edit parameters via st.experimental_data_editor
     # editing parameters should result in change of model
-    # store final parameters to transfer to the fitting section
     
-    model_submit = st.form_submit_button(label = 'Go!')
+    # store final parameters to transfer to the fitting section
+    with model_out:
+        with st.form(key = 'make model'):
+            elec_params = np.append(p_electrode, n_electrode)
+            
+            # change usable cap to be p_cap if half-cell,
+            # nominal/rated cap if full-cell
+#             Q_IM, V_IM, dqdu_IM, dudq_IM = msmr_model.whole_cell(elec_params,
+#                                                                  temp = temp, 
+#                                                                  nor_pos, nor_neg,
+#                                                                  pos_volt_range,
+#                                                                  neg_volt_range,
+#                                                                  pos_lower_li_limit = p_Li_lim,
+#                                                                  neg_lower_li_limit = n_Li_lim, 
+#                                                                  n_p = 1, 
+#                                                                  p_capacity = p_capacity,
+#                                                                  usable_cap = p_capacity, 
+#                                                                  Qj_or_Xj = 'Qj',
+#                                                                  all_output = False)
+            
+            model_submit = st.form_submit_button(label = 'Generate Model')
+
+            if model_submit: 
+                elec_params = np.append(p_electrode, n_electrode)
 # 3. Fit model to data --------------------------------------------

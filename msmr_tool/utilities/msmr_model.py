@@ -33,7 +33,7 @@ def select_electrode(electrode):
     # if the electrode is not on the list
     # user will be prompted to add their own 
     
-    path = 'data/electrode_parameters/' + electrode
+    path = '../data/electrode_parameters/' + electrode
     electrode_params = pd.read_csv(path, index_col = 0)
     
     return electrode_params
